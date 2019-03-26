@@ -1,0 +1,124 @@
+#version 430 core
+
+#include Constants.gl
+#include UBO/Common.gl
+#include UBO/Materials.gl
+#include UBO/Sky.gl
+#include Shadows.gl
+#include UBO/Shadows.gl
+
+layout( location = 0 ) in vec3 vPositionWorldSpace;
+layout( location = 1 ) in vec2 vTexCoords;
+layout( location = 2 ) in vec3 vNormalWorldSpace;
+layout( location = 3 ) in float vDepth;
+layout( location = 4 ) in float flogz;
+
+#ifdef TEXTURE_NORMAL
+ layout( location = 5 ) in mat3 vTBN;
+	uniform sampler2D uNormalSampler;
+#endif
+
+#ifdef TEXTURE_DIFFUSE
+	uniform sampler2D uDiffuseSampler;
+#endif
+
+#ifdef TEXTURE_METALNESS
+	uniform sampler2D uMetalnessSampler;
+#endif
+
+#ifdef TEXTURE_ROUGHNESS
+	uniform sampler2D uRoughnessSampler;
+#endif
+
+#ifdef TEXTURE_AMBIENT
+	uniform sampler2D uAmbientSampler;
+#endif
+
+uniform int                  uMaterialIndex;
+
+uniform sampler2DArrayShadow uSunShadows;
+
+layout( location = 0 ) out vec4 fAlbedo;
+layout( location = 1 ) out vec4 fNormalsDepth;
+layout( location = 2 ) out vec4 fPosition;
+layout( location = 3 ) out vec4 fExtra;
+
+vec2 CompressNormals( in vec3 worldSpaceNormals ) {
+	vec2 compressedNormals = normalize( worldSpaceNormals.xy ) * ( sqrt( -worldSpaceNormals.z * 0.5 + 0.5 ) );
+	compressedNormals *= 0.5 + 0.5;
+	
+	return compressedNormals;
+}
+
+float LinearizeDepth( in float fragmentDepth ) {
+	const float z = fragmentDepth * 2.0 - 1.0;
+ return (2.0 * Common.NearPlane * Common.FarPlane) / (Common.FarPlane + Common.NearPlane - z * (Common.FarPlane - Common.NearPlane));	
+}
+
+void main() {
+ fExtra = vec4( 0.0, 1.0, 0.0, 0.0 );
+ 
+ #ifdef TEXTURE_ROUGHNESS
+  fExtra.r = texture( uRoughnessSampler, vTexCoords ).r;
+ #endif
+ 
+ #ifdef TEXTURE_AMBIENT
+  fExtra.g = texture( uAmbientSampler, vTexCoords ).r;
+ #endif
+ 
+ #ifdef TEXTURE_DIFFUSE
+  vec4 texSample = texture( uDiffuseSampler, vTexCoords );  
+
+  #ifdef TEXTURE_ALPHA_TESTED
+   // avoid alpha testing at all cost (super slow)
+   if( texSample.a < 0.05 ) {
+    discard;
+   }
+  #endif
+  
+  fAlbedo = vec4( pow( texSample.rgb, vec3( 2.2 ) ) * Materials.Data[uMaterialIndex].DiffuseColor, 0.0 );
+	#else
+		fAlbedo = vec4( Materials.Data[uMaterialIndex].DiffuseColor, 0.0 );
+	#endif
+ 
+ #ifdef TEXTURE_METALNESS
+  fAlbedo.a = texture( uMetalnessSampler, vTexCoords ).r;
+ #endif
+
+	bool outOfFrustum = false;
+ vec4 ShadowCoord = vec4( 0.0 );
+ float index = 3.0;
+	vec3 dbgColor = vec3( 0.0, 1.0, 1.0 );
+ 
+	if( vDepth <= Shadows.SunSlices[0].FarDistance ) {
+		ShadowCoord = Shadows.SunSlices[0].ModelView * vec4( vPositionWorldSpace, 1.0 );
+		index = 0.0;
+		dbgColor = vec3( 1.0, 0.0, 0.0 );
+	} else if( vDepth <= Shadows.SunSlices[1].FarDistance ) {
+		ShadowCoord = Shadows.SunSlices[1].ModelView * vec4( vPositionWorldSpace, 1.0 );
+		index = 1.0;
+		dbgColor = vec3( 0.0, 1.0, 0.0 );
+	} else if( vDepth <= Shadows.SunSlices[2].FarDistance ) {
+		ShadowCoord = Shadows.SunSlices[2].ModelView * vec4( vPositionWorldSpace, 1.0 );
+		index = 2.0;
+		dbgColor = vec3( 0.0, 0.0, 1.0 );
+	} else if( vDepth <= Shadows.SunSlices[3].FarDistance ) {
+		ShadowCoord = Shadows.SunSlices[3].ModelView * vec4( vPositionWorldSpace, 1.0 );
+	} else {
+		outOfFrustum = true;
+	}
+
+	if( !outOfFrustum ) {
+   fAlbedo.rgb *= ShadowCompute( ShadowCoord, vNormalWorldSpace, index, uSunShadows );
+ }
+
+ #ifdef TEXTURE_NORMAL
+  fNormalsDepth.xyz = vTBN * normalize( texture( uNormalSampler, vTexCoords ).rgb * 2.0 - 1.0 );
+ #else
+  fNormalsDepth.xyz = vNormalWorldSpace;
+ #endif
+ 
+ gl_FragDepth    = log2( flogz ) * ( 0.5 * ( 2.0 / log2( Common.FarPlane + 1.0 ) ) );
+ fNormalsDepth.w = LinearizeDepth( vDepth );
+	fPosition       = vec4( vPositionWorldSpace, float( uMaterialIndex ) );
+}

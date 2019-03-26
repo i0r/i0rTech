@@ -1,0 +1,82 @@
+#include Brdf.gl
+
+//=================================================================================================
+
+vec4 ComputeLight( in vec3 L, in vec3 V, in vec3 N, in vec3 D, in float M, in float R, in int M_ID  ) {
+ N      = normalize( N );
+  
+ float NoL = dot( N, L );
+ float NoV = dot( N, V );
+ 
+ if( NoL < 0.0 || NoV < 0.0 ) return vec4( 0.0, 0.0, 0.0, 1.0 );
+ 
+ vec3 H = normalize( L + V );
+ 
+ float NoH = dot( N, H );
+ float LoH = dot( L, H );
+ float VoH = dot( V, H );
+ float VoL = dot( V, L );
+ 
+ vec3 F0 = mix( vec3( 0.03 ), D, M );
+ vec3 BD = mix( D, vec3( 0.00 ), M );
+
+ vec3 AD = D * 0.10;
+ 
+ vec3 FRE  = Fresnel_Schlick( F0, LoH );
+ float DIS = Dis_GGX( R, NoH );
+ float GEO = Vis_Smith( R, NoV, NoL );
+ 
+ vec3 SR   = ( DIS * FRE * GEO ) * NoL;
+ 
+ vec3 DR = Diffuse_OrenNayar( BD, R, NoV, NoL, VoH, VoL ); //Diffuse_Burley( BD, R, NoV, NoL, VoH ); //Diffuse_Gotanda( BD, R, NoV, NoL, VoH );
+
+ vec3 reflected_light = vec3( 0.00 );
+ vec3 diffuse_light   = vec3( 0.00 ); 
+ 
+ diffuse_light   += max( DR, AD );
+ reflected_light += SR;
+
+ material_data_t Material = Materials.Data[M_ID];
+ bool envmapFlag = ( ( Material.Flags & 8 ) > 0 );
+
+ vec3 RE = reflect( -V, N );
+ RE.xy  /= abs( RE.z ) + 1.0;
+ RE.xy  = RE.xy * 0.5 + 0.5;
+
+ if( RE.z < 0.0 ) {
+  diffuse_light += textureLod( uFrontParaboloid, RE.xy, 10.0 ).rgb  * ( 1.0 / PI );  
+  if( envmapFlag ) reflected_light += textureLod( uFrontParaboloid, RE.xy, R * 11.0 ).rgb;
+ } else {
+  diffuse_light += textureLod( uRearParaboloid, RE.xy, 10.0 ).rgb  * ( 1.0 / PI );
+  if( envmapFlag ) reflected_light += textureLod( uRearParaboloid, RE.xy, R * 11.0 ).rgb;
+ }
+
+ vec3 result = ( diffuse_light * F0 + reflected_light ) * NoL;      
+ return vec4( result, 1.0 );
+}
+
+//=================================================================================================
+
+vec4 ComputePointLight( point_light_t PL, vec3 WP, vec3 N, vec4 D, float M, float R, int M_ID ) {
+ vec3 L = -normalize( WP - PL.Position.xyz );
+ vec3 V = normalize( Common.ViewPosition - WP );
+
+ vec3 direction = WP - PL.Position.xyz;
+ float distance = length( direction );
+
+ float distance_attenuation = clamp( 1.0 - distance * distance / ( PL.Radius * PL.Radius ), 0.0, 1.0 ); 
+ distance_attenuation *= distance_attenuation;
+ 
+distance = normalize( distance );
+float attenuation = clamp( 1.0 / ( 1.0 + PL.LinearAttenuation * distance + PL.QuadraticAttenuation * ( distance * distance ) ), 0.0, 1.0 ); 
+
+ return ComputeLight( L, V, N, D.rgb, M, R, M_ID ) 
+     * ( vec4( PL.Color.rgb, 1.0 ) * PL.Position.w * distance_attenuation * ( 1.0 / PI ) );
+}
+
+vec4 ComputeSunLight( vec3 SD, vec3 WP, vec3 N, vec4 D, float M, float R, int M_ID ) {
+ vec3 L = normalize( SD.xyz );
+ vec3 V = normalize( Common.ViewPosition - WP );
+
+ return ComputeLight( L, V, N, D.rgb, M, R, M_ID );
+}

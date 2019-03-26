@@ -1,0 +1,13 @@
+#version 430 core
+
+layout( location = 0 ) in vec2 bPosition;
+layout( location = 1 ) in vec2 bTexCoordinates;
+
+uniform vec4 uVertVector4;
+
+layout( location = 0 ) out vec2 vTexCoordinates;
+	
+void main() {
+	gl_Position = vec4( vec3( uVertVector4.xy + uVertVector4.zw * bPosition, 0.0 ), 1.0 );
+	vTexCoordinates = bTexCoordinates;
+}

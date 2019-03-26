@@ -1,0 +1,116 @@
+#include Constants.gl
+
+vec3 Fresnel_Schlick( in vec3 f0, in float LoH ) {
+ return f0 + ( vec3( 1.0 ) - f0 ) * pow( ( 1.0 - LoH ), 5.0 );
+}
+
+vec3 Diffuse_Lambert( vec3 DiffuseColor ) {
+ return DiffuseColor * ( 1 / PI );
+}
+
+vec3 Diffuse_Burley( vec3 DiffuseColor, float Roughness, float NoV, float NoL, float VoH ) {
+	float FD90 = 0.5 + 2 * VoH * VoH * Roughness;
+	float FdV = 1 + ( FD90 - 1 ) * exp2( ( -5.55473 * NoV - 6.98316 ) * NoV );
+	float FdL = 1 + ( FD90 - 1 ) * exp2( ( -5.55473 * NoL - 6.98316 ) * NoL );
+	
+	return DiffuseColor / PI * FdV * FdL;
+}
+
+vec3 Diffuse_Gotanda( vec3 DiffuseColor, float Roughness, float NoV, float NoL, float VoH ) {
+	float a = Roughness * Roughness;
+	float a2 = a * a;
+	float F0 = 0.04;
+	float VoL = 2 * VoH * VoH - 1;
+	float Cosri = VoL - NoV * NoL;
+	float a2_13 = a2 + 1.36053;
+	float Fr = ( 1 - ( 0.542026*a2 + 0.303573*a ) / a2_13 ) * ( 1 - pow( 1 - NoV, 5 - 4*a2 ) / a2_13 ) * ( ( -0.733996*a2*a + 1.50912*a2 - 1.16402*a ) * pow( 1 - NoV, 1 + (39*a2*a2+1) ) + 1 );
+	float Lm = ( max( 1 - 2*a, 0 ) * ( 1 - exp2( -5.55473 * NoL - 6.98316 ) ) + min( 2*a, 1 ) ) * ( 1 - 0.5*a * (NoL - 1) ) * NoL;
+	float Vd = ( a2 / ( (a2 + 0.09) * (1.31072 + 0.995584 * NoV) ) ) * ( 1 - pow( 1 - NoL, ( 1 - 0.3726732 * NoV * NoV ) / ( 0.188566 + 0.38841 * NoV ) ) );
+	float Bp = Cosri < 0 ? 1.4 * NoV * NoL * Cosri : Cosri;
+	float Lr = (21.0 / 20.0) * (1 - F0) * ( Fr * Lm + Vd + Bp );
+	
+	return DiffuseColor / PI * Lr;
+}
+
+vec3 Diffuse_OrenNayar( vec3 DiffuseColor, float Roughness, float NoV, float NoL, float VoH, float VoL ) {
+	float m = Roughness * Roughness;
+	float m2 = m * m;
+	float C1 = 1 - 0.5 * m2 / (m2 + 0.33);
+	float Cosri = VoL - NoV * NoL;
+	float C2 = 0.45 * m2 / (m2 + 0.09) * Cosri * ( Cosri >= 0 ? min( 1, NoL / NoV ) : NoL );
+	
+	return DiffuseColor / PI * ( NoL * C1 + C2 );
+}
+
+float Dis_GGX_FB( float Roughness, float NoL, float NoV ) {
+ float RR = Roughness * Roughness;
+	float Lambda_GGXV = NoL * sqrt (( - NoV * RR + NoV ) * NoV + RR );
+	float Lambda_GGXL = NoV * sqrt (( - NoL * RR + NoL ) * NoL + RR );
+
+	return 0.5f / ( Lambda_GGXV + Lambda_GGXL );
+}
+
+float Dis_GGX( float Roughness, float NoH ) {
+	float m = Roughness * Roughness;
+	float m2 = m * m;
+	float d = ( NoH * m2 - NoH ) * NoH + 1.0;
+	
+	return m2 / max( PI * d * d, 0.001 );
+}
+
+float Dis_Blinn( float Roughness, float NoH ) {
+	float a = Roughness * Roughness;
+	float a2 = a * a;
+	float n = 2 / a2 - 2;
+	
+	return ( n + 2 ) / 2 * PI * max( 0.0, pow( NoH, n ) );
+}
+
+float Dis_Beckmann( float Roughness, float NoH ) {
+	float a = Roughness * Roughness;
+	float a2 = a * a;
+	float NoH2 = NoH * NoH;
+	
+	return exp( ( NoH2 - 1 ) / ( a2 * NoH2 ) ) / ( PI * a2 * NoH2 * NoH2 );
+}
+
+float Dis_Anisotropic( float RoughnessX, float RoughnessY, float NoH, vec3 H, vec3 X, vec3 Y ) {
+	float ax = RoughnessX * RoughnessX;
+	float ay = RoughnessY * RoughnessY;
+	float XoH = dot( X, H );
+	float YoH = dot( Y, H );
+	float d = XoH * XoH / ax * ax + YoH * YoH / ay * ay + NoH * NoH;
+	
+	return 1 / ( PI * ax*ay * d*d );
+}
+
+float Vis_Schlick( float roughness, float ndotv, float ndotl ) {
+	float a = roughness + 1.0;
+	float k = a * a * 0.125;
+
+	float Vis_SchlickV = ndotv * (1 - k) + k;
+	float Vis_SchlickL = ndotl * (1 - k) + k;
+
+	return 0.25 / (Vis_SchlickV * Vis_SchlickL);
+}
+
+float Vis_Neumann( in float NoV, in float NoL ) {
+	return 1 / ( 4 * max( NoL, NoV ) );
+}
+
+float Vis_Smith( in float Roughness, in float NoV, in float NoL ) {
+	float a = Roughness * Roughness;
+	float Vis_SmithV = NoL * ( NoV * ( 1 - a ) + a );
+	float Vis_SmithL = NoV * ( NoL * ( 1 - a ) + a );
+	
+	return 0.5 * ( Vis_SmithV + Vis_SmithL );
+}
+
+vec3 Spec_Phong(in vec3 V, in vec3 L, in vec3 N, in vec3 specular, in float roughness) {
+ vec3 R = reflect(-L, N);
+ float spec = max(0.0, dot(V, R));
+
+ float k = 1.999 / (roughness * roughness);
+
+ return min(1.0, 3.0 * 0.0398 * k) * pow(spec, min(10000.0, k)) * specular;
+}

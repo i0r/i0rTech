@@ -1,0 +1,18 @@
+#define UBO_MATERIALS_MAX_COUNT 256
+
+struct material_data_t {
+  vec4     DSSHEFactors;   // DiffuseSpecularSpecularHardnessEmissive
+  uint     Flags;
+  uint     Shading;
+  uint     Alpha;
+  uint     PLACEHOLDER;
+  vec3     DiffuseColor;
+  uint     PADDING;
+  vec3     SpecularColor;
+  uint     PADDING2;
+};
+
+layout( std140 ) uniform ubo_materials_t {
+	material_data_t Data[UBO_MATERIALS_MAX_COUNT];
+	uint            MaterialsCount;
+} Materials;

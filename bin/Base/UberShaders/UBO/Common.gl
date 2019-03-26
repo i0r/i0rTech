@@ -1,0 +1,20 @@
+// note: padding is required since vectors are aligned on CPU (due to SSE)
+layout( std140 ) uniform ubo_common_t {
+	mat4 View;
+	mat4 InverseView;
+	
+	mat4 Projection;
+	mat4 InverseProjection;
+	
+	mat4 ViewProjection;
+	mat4 InverseViewProjection;
+  
+	vec3 ViewPosition;
+ float ViewPositionPadding;
+
+	vec2 ScreenSize;
+	vec2 ScreenSizePadding;
+ 
+	float NearPlane;
+	float FarPlane;
+} Common;

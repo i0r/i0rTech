@@ -1,0 +1,143 @@
+#version 430 core
+
+#include UBO/Common.gl
+
+layout( location = 0 ) in vec2 vTexCoordinates;
+
+uniform sampler2D gPosition;
+uniform sampler2D gNormal;
+uniform sampler2D gNoise;
+
+uniform vec3 uSamples[64];
+int kernelSize = 64;
+float radius = 1.0;
+
+layout( location = 0 ) out float fColor;
+
+void main() {
+ const vec2 noiseScale = vec2( Common.ScreenSize.x / 4.0, Common.ScreenSize.y / 4.0 ); 
+
+ vec3 fragPos   = texture( gPosition, vTexCoordinates ).rgb;
+ vec3 normal    = texture( gNormal, vTexCoordinates ).rgb;
+ vec3 randomVec = texture( gNoise, vTexCoordinates * noiseScale ).rgb;
+ 
+ vec3 tangent = normalize( randomVec - normal * dot( randomVec, normal ) );
+ vec3 bitangent = cross( normal, tangent);
+ mat3 TBN = mat3( tangent, bitangent, normal );
+ 
+ // Iterate over the sample kernel and calculate occlusion factor
+ float occlusion = 0.0;
+ for( int i = 0; i < kernelSize; ++i ) {
+     // get sample position
+     vec3 samplePos = TBN * uSamples[i]; // From tangent to view-space
+     samplePos = fragPos + samplePos * radius; 
+     
+     // project sample position (to sample texture) (to get position on screen/texture)
+     vec4 offset = vec4(samplePos, 1.0);
+     offset = Common.Projection * offset; // from view to clip-space
+     offset.xyz /= offset.w; // perspective divide
+     offset.xyz = offset.xyz * 0.5 + 0.5; // transform to range 0.0 - 1.0
+     
+     // get sample depth
+     float sampleDepth = -texture(gNormal, offset.xy).w; // Get depth value of kernel sample
+     
+     // range check & accumulate
+     float rangeCheck = smoothstep(0.0, 1.0, radius / abs(fragPos.z - sampleDepth ));
+     occlusion += (sampleDepth >= samplePos.z ? 1.0 : 0.0) * rangeCheck;           
+ }
+ occlusion = 1.0 - (occlusion / kernelSize);
+
+ fColor = occlusion;
+}
+
+// #version 430 core
+
+// #include UBO/Common.gl
+
+// layout( location = 0 ) in vec2 vTexCoordinates;
+
+// uniform sampler2D gPosition;
+// uniform sampler2D gNormal;
+// uniform sampler2D gNoise;
+
+// const int uSampleCount = 16;
+
+// const vec3 uSamples[32] =	{
+		// vec3(-0.134, 0.044, -0.825),
+		// vec3(0.045, -0.431, -0.529),
+		// vec3(-0.537, 0.195, -0.371),
+		// vec3(0.525, -0.397, 0.713),
+		// vec3(0.895, 0.302, 0.139),
+		// vec3(-0.613, -0.408, -0.141),
+		// vec3(0.307, 0.822, 0.169),
+		// vec3(-0.819, 0.037, -0.388),
+		// vec3(0.376, 0.009, 0.193),
+		// vec3(-0.006, -0.103, -0.035),
+		// vec3(0.098, 0.393, 0.019),
+		// vec3(0.542, -0.218, -0.593),
+		// vec3(0.526, -0.183, 0.424),
+		// vec3(-0.529, -0.178, 0.684),
+		// vec3(0.066, -0.657, -0.570),
+		// vec3(-0.214, 0.288, 0.188),
+		// vec3(-0.689, -0.222, -0.192),
+		// vec3(-0.008, -0.212, -0.721),
+		// vec3(0.053, -0.863, 0.054),
+		// vec3(0.639, -0.558, 0.289),
+		// vec3(-0.255, 0.958, 0.099),
+		// vec3(-0.488, 0.473, -0.381),
+		// vec3(-0.592, -0.332, 0.137),
+		// vec3(0.080, 0.756, -0.494),
+		// vec3(-0.638, 0.319, 0.686),
+		// vec3(-0.663, 0.230, -0.634),
+		// vec3(0.235, -0.547, 0.664),
+		// vec3(0.164, -0.710, 0.086),
+		// vec3(-0.009, 0.493, -0.038),
+		// vec3(-0.322, 0.147, -0.105),
+		// vec3(-0.554, -0.725, 0.289),
+		// vec3(0.534, 0.157, -0.250)
+// };
+
+// const float uOcclusionRadius  = 1.0;
+// const float uOcclusionMaxDist = 10.0;
+
+// layout( location = 0 ) out vec4 fColor;
+
+// void main() {
+	// vec3  Position  = texture( gPosition, vTexCoordinates ).xyz;
+ // float CenterPos = distance( Common.ViewPosition, Position );
+ // float Radius    = uOcclusionRadius / CenterPos;
+ 
+ // float MaxDistanceInv = 1.0 / uOcclusionMaxDist;
+	// const float attenuation_angle_threshold = 0.1;
+ 
+ // vec3 Noise = texture( gNoise, vTexCoordinates * Common.ScreenSize / 16.0 ).xyz * 2.0 - 1.0;
+ 
+ // vec3 CenterNormal = texture( gNormal, vTexCoordinates ).xyz;
+
+	// vec4 occlusion_sh2 = vec4( 0 );
+
+	// const float fudge_factor_l0 = 2.0;
+	// const float fudge_factor_l1 = 10.0;
+
+	// const float sh2_weight_l0 = fudge_factor_l0 * 0.28209; //0.5*sqrt(1.0/pi);
+	// const vec3 sh2_weight_l1 = vec3( fudge_factor_l1 * 0.48860 ); //0.5*sqrt(3.0/pi);
+ // const vec4 sh2_weight = vec4(sh2_weight_l1, sh2_weight_l0) / uSampleCount;
+ 
+ // for( int i=0; i<uSampleCount; ++i )
+	// {
+  // vec2 textureOffset = reflect( uSamples[ i ].xy, Noise.xy ).xy * Radius;
+  // vec2 sample_tex = vTexCoordinates + textureOffset;
+  // vec3 sample_pos = texture( gPosition, sample_tex ).xyz;
+  // vec3 center_to_sample = sample_pos - CenterPos;
+  // float dist = length(center_to_sample);
+  // vec3 center_to_sample_normalized = center_to_sample / dist;
+  // float attenuation = 1.0-clamp(dist * MaxDistanceInv,0.0,1.0);
+  // float dp = dot(CenterNormal, center_to_sample_normalized);
+
+  // attenuation = attenuation*attenuation * step(attenuation_angle_threshold, dp);
+
+  // occlusion_sh2 += attenuation * sh2_weight*vec4(center_to_sample_normalized,1);
+	// }
+
+	// fColor = occlusion_sh2;
+// }

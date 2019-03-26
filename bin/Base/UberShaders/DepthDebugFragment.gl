@@ -1,0 +1,12 @@
+#version 430 core
+
+layout(location = 0) out vec4 fColor;
+in vec2 vTexCoordinates;
+
+uniform sampler2D uDepthSampler;
+
+void main() {
+ float d = texture( uDepthSampler, vTexCoordinates.xy ).r;
+
+ fColor = vec4( vec3( d ), 1.0 );
+}

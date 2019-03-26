@@ -1,0 +1,9 @@
+#version 430 core
+
+layout(location = 0) out vec4 fColor;
+
+uniform vec4 uWireColor;
+
+void main() {
+ fColor = uWireColor;
+}

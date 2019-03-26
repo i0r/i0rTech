@@ -1,0 +1,29 @@
+#extension GL_EXT_geometry_shader4 : enable
+
+layout( triangles ) in;
+layout( triangle_strip, max_vertices = 3 ) out;
+
+layout( location = 0 ) in vec2 vTexCoordinates[];
+
+uniform int uLayer;
+
+layout( location = 0 ) out vec2 gTexCoordinates;
+
+void main() {
+ gl_Position = gl_PositionIn[0];
+ gTexCoordinates = vTexCoordinates[0];
+ gl_Layer = uLayer;
+ EmitVertex();
+
+ gl_Position = gl_PositionIn[1];
+ gTexCoordinates = vTexCoordinates[1];
+ gl_Layer = uLayer;
+ EmitVertex();
+
+ gl_Position = gl_PositionIn[2];
+ gTexCoordinates = vTexCoordinates[2];
+ gl_Layer = uLayer;
+ EmitVertex();
+
+ EndPrimitive();
+}

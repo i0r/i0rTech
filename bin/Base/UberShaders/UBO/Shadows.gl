@@ -1,0 +1,10 @@
+#define SHADOW_DL_SPLIT_COUNT			4
+
+struct ubo_shadow_slice_t {
+	mat4  ModelView;
+	float FarDistance;
+};
+
+layout( std140 ) uniform ubo_shadows_t {
+	ubo_shadow_slice_t SunSlices[SHADOW_DL_SPLIT_COUNT];
+} Shadows;

@@ -1,0 +1,8 @@
+#define UBO_LIGHTS_MAX_POINT_LIGHT 256
+
+#include PointLight.gl
+
+layout( std140 ) uniform ubo_light_t {
+	point_light_t PointLights[UBO_LIGHTS_MAX_POINT_LIGHT];
+	uint          PointLightsCount;
+} Lights;

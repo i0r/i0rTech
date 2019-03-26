@@ -1,0 +1,17 @@
+#version 430 core
+
+layout(location = 0) in vec3 bPosition;
+layout(location = 1) in vec2 bTexCoordinates;
+layout(location = 2) in vec3 bNormals;
+
+#ifdef TEXTURE_NORMAL
+ layout(location = 3) in vec3 bTangents;
+ layout(location = 4) in vec3 bBiTangents;
+#endif
+
+uniform mat4 uViewProjection;
+uniform mat4 uModel;
+
+void main() {
+	gl_Position = uViewProjection * ( uModel * vec4( bPosition, 1.0 ) );
+}

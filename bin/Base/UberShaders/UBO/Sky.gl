@@ -1,0 +1,15 @@
+layout( std140 ) uniform ubo_sky_t {
+	vec3 A;
+	vec3 B;
+	vec3 C;
+	vec3 D;
+	vec3 E;
+	vec3 F;
+	vec3 G;
+	vec3 H;
+	vec3 I;
+	vec3 Z;
+	
+	vec3 SunDirection;
+	vec3 SunShadowDir;
+} Sky;

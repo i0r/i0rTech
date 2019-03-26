@@ -1,0 +1,28 @@
+layout( location = 0 ) in vec3 bPosition;
+
+#ifdef UV_ATTRIBUTE
+ layout( location = 1 ) in vec2 bTexCoordinates;
+#endif
+
+#ifdef CUSTOM_SCREENPOS
+ uniform float uScreenPosX;
+ uniform float uScreenPosY;
+ uniform float uScreenScaleX;
+ uniform float uScreenScaleY;
+#endif
+ 
+layout( location = 0 ) out vec2 vTexCoordinates;
+
+void main() {
+ #ifdef CUSTOM_SCREENPOS
+  gl_Position = vec4( ( bPosition.x + uScreenPosX ) * uScreenScaleX, ( bPosition.y + uScreenPosY ) * uScreenScaleY, bPosition.z, 1.0 );
+ #else
+  gl_Position = vec4( bPosition.x, bPosition.y, bPosition.z, 1.0 );
+ #endif
+ #ifdef UV_ATTRIBUTE
+  vTexCoordinates = bTexCoordinates;
+ #else
+  vTexCoordinates = ( bPosition.xy + vec2( 1.0 ) ) / 2.0;
+  vTexCoordinates.y = -vTexCoordinates.y;
+ #endif
+}

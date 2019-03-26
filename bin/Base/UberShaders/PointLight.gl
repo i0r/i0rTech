@@ -1,0 +1,10 @@
+struct point_light_t {
+	vec4  Position;
+ 
+	vec4  Color;
+ 
+ float QuadraticAttenuation;
+ float LinearAttenuation;
+ float Radius;
+ uint PADDING;
+};
